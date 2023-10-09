@@ -1,4 +1,4 @@
-name: Build twrp
+name: build twrp
 
 on:
   watch:
