@@ -2,6 +2,8 @@
 
 <h1>Build Your Recovery with Github Action</h1>
 
+</div>
+
 # How to Use
 1. Fork this repository.
 
