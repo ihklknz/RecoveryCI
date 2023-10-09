@@ -13,13 +13,10 @@ jobs:
     outputs:
       builddate: ${{ steps.generate-builddate.outputs.builddate }}
     steps:
-      - name: Cleanup
-        uses: rokibhasansagar/slimhub_actions@main
-
-      - name: Set Git Config
-        run: |
-          git config --global user.name "shenprjkt"
-          git config --global user.email "shenprjktplayground@gmail.com"
+    - name: Set Git Config
+      run: |
+        git config --global user.name "shenprjkt"
+        git config --global user.email "shenprjktplayground@gmail.com"
       
   Build-Recovery:
     name: "Build Recovery"
@@ -36,6 +33,9 @@ jobs:
         echo "MAKEFILE_NAME=$(cat config.env | grep "MAKEFILE_NAME" | head -n 1 | cut -d "=" -f 2)" >> $GITHUB_ENV
         echo "MAKEWHAT=$(cat config.env | grep "MAKEWHAT" | head -n 1 | cut -d "=" -f 2)" >> $GITHUB_ENV
         echo "DEVICE_NAME=$(cat config.env | grep "DEVICE_NAME" | head -n 1 | cut -d "=" -f 2)" >> $GITHUB_ENV
+
+    - name: Cleanup
+      uses: rokibhasansagar/slimhub_actions@main
 
     - name: Setup Enviroment
       run: |
