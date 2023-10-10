@@ -1,0 +1,87 @@
+name: build shrp
+
+on:
+  watch:
+    types: [started]
+
+  workflow_dispatch:
+        
+jobs:
+  Set-repos:
+    name: "Setup"
+    runs-on: ubuntu-latest
+    outputs:
+      builddate: ${{ steps.generate-builddate.outputs.builddate }}
+    steps:
+    - name: Set Git Config
+      run: |
+        git config --global user.name "shenprjkt"
+        git config --global user.email "shenprjktplayground@gmail.com"
+      
+  Build-Recovery:
+    name: "Build Recovery"
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    - name: Setup Configuration
+      run: |
+        echo "MANIFEST=$(cat shrp.env | grep "MANIFEST" | head -n 1 | cut -d "=" -f 2)" >> $GITHUB_ENV
+        echo "MANIFEST_BRANCH=$(cat shrp.env | grep "MANIFEST_BRANCH" | head -n 1 | cut -d "=" -f 2)" >> $GITHUB_ENV
+        echo "DEVICE_TREE=$(cat shrp.env | grep "DEVICE_TREE" | head -n 1 | cut -d "=" -f 2)" >> $GITHUB_ENV
+        echo "DEVICE_TREE_BRANCH=$(cat shrp.env | grep "DEVICE_TREE_BRANCH" | head -n 1 | cut -d "=" -f 2)" >> $GITHUB_ENV
+        echo "DEVICE_PATH=$(cat shrp.env | grep "DEVICE_PATH" | head -n 1 | cut -d "=" -f 2)" >> $GITHUB_ENV
+        echo "MAKEFILE_NAME=$(cat shrp.env | grep "MAKEFILE_NAME" | head -n 1 | cut -d "=" -f 2)" >> $GITHUB_ENV
+        echo "MAKEWHAT=$(cat shrp.env | grep "MAKEWHAT" | head -n 1 | cut -d "=" -f 2)" >> $GITHUB_ENV
+        echo "DEVICE_NAME=$(cat shrp.env | grep "DEVICE_NAME" | head -n 1 | cut -d "=" -f 2)" >> $GITHUB_ENV
+
+    - name: Cleanup
+      uses: rokibhasansagar/slimhub_actions@main
+
+    - name: Set Swap Space
+      uses: pierotofy/set-swap-space@master
+      with:
+        swap-size-gb: 12
+
+    - name: Setup Enviroment
+      run: |
+        sudo apt update
+        sudo apt -y upgrade
+        sudo apt -y install gperf gcc-multilib gcc-10-multilib g++-multilib g++-10-multilib libc6-dev lib32ncurses5-dev x11proto-core-dev libx11-dev tree lib32z-dev libgl1-mesa-dev libxml2-utils xsltproc bc ccache lib32readline-dev lib32z1-dev liblz4-tool libncurses5-dev libsdl1.2-dev libwxgtk3.0-gtk3-dev libxml2 lzop pngcrush schedtool squashfs-tools imagemagick libbz2-dev lzma ncftp qemu-user-static libstdc++-10-dev libncurses5 python2 python3
+
+    - name: Add Repo
+      run: |
+        mkdir ~/bin
+        curl https://storage.googleapis.com/git-repo-downloads/repo > ~/bin/repo
+        chmod a+x ~/bin/repo
+        sudo ln -sf ~/bin/repo /usr/bin/repo
+
+    - name: Install Repo
+      run: |
+        mkdir workspace
+        cd workspace
+        echo "workspace-folder=$(pwd)" >> $GITHUB_OUTPUT
+        repo init --depth=1 -u ${{ env.MANIFEST }} -b ${{ env.MANIFEST_BRANCH }}
+        
+    - name: Repo Sync
+      run: |
+        repo sync -j$(nproc --all) --force-sync
+      working-directory: workspace
+  
+    - name: Clone Device Tree
+      run: |
+        cd ${GITHUB_WORKSPACE}/workspace
+        git clone ${{ env.DEVICE_TREE }} -b ${{ env.DEVICE_TREE_BRANCH }} ./${{ env.DEVICE_PATH }}
+        
+    - name: Building recovery
+      run: |
+        cd ${GITHUB_WORKSPACE}/workspace
+        . build/envsetup.sh
+        lunch ${{ env.MAKEFILE_NAME }}-eng
+        echo "BUILD_TIME=$(TZ=Asia/Shanghai date "+%Y%m%d%H%M")" >> $GITHUB_ENV
+        mka ${{ env.MAKEWHAT }}image -j2
+
+    - name: Upload to Release 
+      uses: actions/upload-artifact@v3
+      with:
+        name: ${{ env.MAKEWHAT }}-${{ env.DEVICE_NAME }}-${{ env.BUILD_TIME }}
+        path: workspace/out/target/product/${{ env.DEVICE_NAME }}/${{ env.MAKEWHAT }}.img
